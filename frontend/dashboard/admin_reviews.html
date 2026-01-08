@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Admin · Reviews</title>
+
+<style>
+:root{
+  --primary:#0b74de; --danger:#d9534f; --card:#fff; --bg:#f6f8fb;
+}
+body{
+  margin:0; background:var(--bg); font-family:Arial; padding:20px;
+}
+.page{
+  max-width:900px; margin:auto; background:var(--card);
+  padding:20px; border-radius:10px;
+  box-shadow:0 4px 14px rgba(0,0,0,0.08);
+}
+h2{ margin:0 0 10px 0; }
+.back-btn{
+  text-decoration:none; padding:8px 12px;
+  background:#6c757d; color:white; border-radius:6px;
+  margin-bottom:10px; display:inline-block;
+}
+.review-box{
+  background:#fff; padding:14px; border-radius:8px;
+  border:1px solid #e4e4e4; margin-bottom:12px;
+}
+.sm{
+  color:#666; font-size:13px; margin-top:4px;
+}
+.rating{
+  font-weight:bold; color:#ff9800; font-size:15px;
+}
+.btn-danger{
+  background:var(--danger); border:0; padding:6px 10px;
+  color:white; border-radius:6px; cursor:pointer;
+}
+</style>
+</head>
+
+<body>
+
+<div class="page">
+
+  <a href="/dashboard/all_shop" class="back-btn">⬅ Back</a>
+  <h2>Shop Reviews</h2>
+
+  <div id="reviewsList">Loading reviews...</div>
+
+</div>
+
+<script>
+const API = ""; // your backend URL
+
+const params = new URLSearchParams(window.location.search);
+const shopId = params.get("shop_id");
+
+if (!shopId) {
+  document.getElementById("reviewsList").innerHTML =
+    "<div style='color:red'>Missing shop_id</div>";
+}
+
+async function api(path, opts={}) {
+  try {
+    let res = await fetch(API + path, opts);
+    let json = await res.json().catch(()=>null);
+    return { ok:res.ok, json };
+  } catch (e) {
+    return { ok:false, json:null };
+  }
+}
+
+/* LOAD REVIEWS */
+async function loadReviews(){
+  const box = document.getElementById("reviewsList");
+  box.innerHTML = "Loading...";
+
+  let r = await api(`/reviews/all/?shop_id=${shopId}`);
+
+  if (!r.json || r.json.status !== true) {
+    box.innerHTML = "<div>Error loading reviews</div>";
+    return;
+  }
+
+  const list = r.json.data;
+
+  if (!list || list.length === 0) {
+    box.innerHTML = "<div>No reviews found</div>";
+    return;
+  }
+
+  box.innerHTML = "";
+
+  list.forEach(rv => {
+    let div = document.createElement("div");
+    div.className = "review-box";
+
+    div.innerHTML = `
+      <div class="rating">⭐ ${rv.rating}</div>
+      <div>${rv.review}</div>
+      <div class="sm">User: ${rv.username || "unknown"}</div>
+      <div class="sm">Date: ${rv.date || "N/A"}</div>
+
+      <button class="btn-danger" onclick="deleteReview('${rv._id}')">
+        Delete
+      </button>
+    `;
+
+    box.appendChild(div);
+  });
+}
+
+/* DELETE REVIEW */
+async function deleteReview(id){
+  if (!confirm("Delete this review?")) return;
+
+  let r = await api(`/reviews/delete/${id}`, {
+    method: "DELETE"
+  });
+
+  if (!r.json || r.json.status !== true){
+    alert("Failed to delete");
+    return;
+  }
+
+  alert("Review deleted");
+  loadReviews();
+}
+
+loadReviews();
+</script>
+
+</body>
+</html>

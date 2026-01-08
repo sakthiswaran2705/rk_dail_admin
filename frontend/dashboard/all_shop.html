@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Admin · Shop Manager</title>
+
+<style>
+:root{
+  --bg:#f6f8fb; --card:#fff; --primary:#0b74de; --danger:#e04b4b; --muted:#6b7280; --info:#17a2b8;
+  --radius:10px; --pad:14px;
+}
+*{box-sizing:border-box;font-family:Inter, Arial, sans-serif}
+body{margin:0;background:var(--bg);color:#111;padding:18px}
+.wrap{max-width:1200px;margin:0 auto}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.panel{background:var(--card);border-radius:var(--radius);padding:var(--pad);box-shadow:0 6px 18px rgba(10,10,30,0.06)}
+.grid{display:grid;grid-template-columns:1fr 420px;gap:16px;align-items:start}
+.label{font-size:13px;color:#333;margin:8px 0 6px;display:block;font-weight:600}
+.input,textarea,select{width:100%;padding:9px;border-radius:8px;border:1px solid #dbe3ea;font-size:14px}
+textarea{min-height:64px;resize:vertical}
+.btn{border:0;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:700;transition:0.2s;font-size:13px}
+.btn:hover{opacity:0.9}
+.btn-primary{background:var(--primary);color:white}
+.btn-danger{background:var(--danger);color:white}
+.btn-muted{background:#6c757d;color:white}
+.btn-info{background:var(--info);color:white}
+
+.table{width:100%;border-collapse:collapse;margin-top:12px}
+.table th,.table td{padding:10px;border-bottom:1px solid #eef1f4;text-align:left;vertical-align:middle}
+.table th{background:var(--primary);color:#fff}
+.sm{font-size:13px;color:var(--muted)}
+
+/* Image Handling Styles */
+.photo-thumb{width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid #ddd;}
+.photo-box{position:relative;display:inline-block;margin:5px;}
+.photo-del{position:absolute;top:-6px;right:-6px;background:var(--danger);color:white;border:none;width:20px;height:20px;border-radius:50%;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 4px rgba(0,0,0,0.2)}
+.shop-mini-img { width: 50px; height: 50px; border-radius: 6px; object-fit: cover; margin-right: 10px; background: #eee; border:1px solid #eee; }
+
+/* Autocomplete Styles */
+.autocomplete-wrap { position: relative; }
+.suggestions-box {
+    position: absolute; top: 100%; left: 0; right: 0;
+    background: white; border: 1px solid #dbe3ea;
+    border-radius: 0 0 8px 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    z-index: 1000; max-height: 200px; overflow-y: auto;
+    display: none;
+}
+.suggestion-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+.suggestion-item:hover { background: #f6f8fb; color: var(--primary); }
+
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(2px)}
+.modal{background:var(--card);width:96%;max-width:980px;border-radius:12px;padding:20px;max-height:90vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,0.2)}
+
+.flex{display:flex;gap:10px;align-items:center}
+.back-btn { background:#6c757d; color:white; padding:6px 14px; border-radius:6px; font-size:14px; text-decoration:none; font-weight:600; }
+
+@media(max-width:980px){
+  .grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <div class="flex">
+        <a href="admin" class="back-btn">⬅ Dashboard</a>
+        <h2>Shop Manager</h2>
+    </div>
+    <button class="btn btn-muted" onclick="loadShops()">Refresh Data</button>
+  </div>
+
+  <div class="grid">
+
+    <div class="panel">
+      <strong>Approved Shops Database</strong>
+      <div class="sm">Live Data from Backend</div>
+      <input id="shopSearch" class="input" placeholder="Search by name..." oninput="filterShops()" style="margin:10px 0">
+      <div style="overflow-x:auto">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Shop Details</th>
+                <th>Owner / Contact</th>
+                <th>Location</th>
+                <th style="width:180px">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="shopsTbody"><tr><td colspan="4">Loading...</td></tr></tbody>
+          </table>
+      </div>
+    </div>
+
+    <div class="panel">
+        <strong style="font-size:16px">➕ Add New Shop</strong>
+        <form id="addShopForm" onsubmit="event.preventDefault(); addShop()">
+
+          <label class="label">User Identifier (Phone/Email)</label>
+          <input class="input" name="phoneid" required placeholder="User ID">
+
+          <label class="label">Shop Name</label>
+          <input class="input" name="shop_name" required>
+
+          <label class="label">Description</label>
+          <textarea class="input" name="description" required style="height:50px"></textarea>
+
+          <label class="label">Address</label>
+          <input class="input" name="address" required>
+
+          <div class="flex">
+            <div style="flex:1"><label class="label">Shop Phone</label><input class="input" name="phone_number" required></div>
+
+            <div style="width:120px"><label class="label">Pincode</label><input class="input" name="pincode" id="pincodeInput" required></div>
+          </div>
+
+          <label class="label">Email</label>
+          <input class="input" name="email" type="email">
+
+          <label class="label">Landmark</label>
+          <input class="input" name="landmark">
+
+          <label class="label">City Name (Type to search)</label>
+          <div class="autocomplete-wrap">
+              <input class="input" name="city_name" id="cityInput" required placeholder="Type city name..." oninput="searchCity(this.value)" autocomplete="off">
+              <div id="citySuggestions" class="suggestions-box"></div>
+          </div>
+
+          <div class="flex">
+             <div style="flex:1"><label class="label">District</label><input class="input" name="district" id="districtInput" readonly style="background:#f9f9f9"></div>
+             <div style="flex:1"><label class="label">State</label><input class="input" name="state" id="stateInput" readonly style="background:#f9f9f9"></div>
+          </div>
+
+          <label class="label">Categories (Type to search)</label>
+          <div class="autocomplete-wrap">
+              <input class="input" name="category_list" id="catInput" placeholder="e.g. Hotel, Food" oninput="searchCategory(this.value)" autocomplete="off">
+              <div id="catSuggestions" class="suggestions-box"></div>
+          </div>
+
+          <label class="label">Keywords</label>
+          <input class="input" name="keywords" placeholder="Search tags...">
+
+          <div style="background:#f0f4f8; padding:10px; border-radius:8px; margin-top:10px;">
+              <label class="label">1. Main Cover Image</label>
+              <div class="flex">
+                  <img id="main_preview_add" src="https://via.placeholder.com/60?text=None" style="width:60px;height:60px;object-fit:cover;border-radius:4px;border:1px solid #ccc">
+                  <input type="file" name="main_image" class="input" accept="image/*" style="background:white" onchange="previewMainImg(this, 'main_preview_add')">
+              </div>
+
+              <label class="label" style="margin-top:10px">2. Gallery Photos</label>
+              <input type="file" id="add_photos" multiple accept="image/*" class="input" style="background:white">
+              <div id="add_photos_preview" style="display:flex;flex-wrap:wrap;margin-top:5px"></div>
+          </div>
+
+          <div class="flex" style="margin-top:15px">
+            <button class="btn btn-primary" style="flex:1">Create Shop</button>
+            <button class="btn btn-muted" type="reset">Reset</button>
+          </div>
+        </form>
+    </div>
+
+  </div>
+</div>
+
+<div id="editBackdrop" class="modal-backdrop">
+  <div class="modal">
+    <div class="flex" style="justify-content:space-between; margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:10px">
+        <h3 style="margin:0">Edit Shop Details</h3>
+        <button class="btn btn-muted" onclick="closeEdit()">✕</button>
+    </div>
+
+    <input type="hidden" id="edit_shop_id">
+
+    <div class="flex">
+        <div style="flex:1">
+            <label class="label">Shop Name</label>
+            <input class="input" id="edit_shop_name">
+        </div>
+        <div style="flex:1">
+            <label class="label">Landmark</label>
+            <input class="input" id="edit_landmark">
+        </div>
+    </div>
+
+    <label class="label">Description</label>
+    <textarea class="input" id="edit_description"></textarea>
+
+    <div class="flex">
+        <div style="flex:1"><label class="label">Shop Phone</label><input class="input" id="edit_phone"></div>
+        <div style="flex:1"><label class="label">Email</label><input class="input" id="edit_email"></div>
+    </div>
+
+    <label class="label">Address</label>
+    <input class="input" id="edit_address">
+
+    <div class="flex">
+        <div style="flex:1"><label class="label">City Name (Update)</label><input class="input" id="edit_city_name"></div>
+        <div style="width:150px"><label class="label">Keywords</label><input class="input" id="edit_keywords"></div>
+    </div>
+
+    <div style="background:#fafafa; padding:12px; border-radius:8px; margin-top:15px; border:1px solid #eee">
+        <h4 style="margin:0 0 10px 0; font-size:14px">Image Management</h4>
+
+        <div style="margin-bottom:15px; padding-bottom:15px; border-bottom:1px solid #ddd">
+            <label class="label">Update Main Cover Image</label>
+            <div class="flex">
+                <img id="edit_preview_main" src="" style="width:60px; height:60px; border-radius:4px; border:1px solid #ccc; background:#eee; object-fit:cover">
+                <div style="flex:1">
+                    <input type="file" id="edit_main_image" accept="image/*" class="input" onchange="previewMainImg(this, 'edit_preview_main')">
+                    <div class="sm" style="margin-top:4px">Upload new to replace existing main image.</div>
+                </div>
+            </div>
+        </div>
+
+        <label class="label">Current Gallery Photos</label>
+        <div id="edit_photos_area" style="display:flex; flex-wrap:wrap; gap:10px; min-height:50px; background:white; padding:10px; border-radius:6px; border:1px solid #eee">
+            <span class="sm">No gallery photos.</span>
+        </div>
+
+        <label class="label" style="margin-top:10px">Add More Gallery Photos</label>
+        <input type="file" id="edit_new_photos" multiple accept="image/*" class="input">
+    </div>
+
+    <div class="flex" style="margin-top:20px; border-top:1px solid #eee; padding-top:15px">
+      <button class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-danger" onclick="deleteShopFromModal()">Delete Shop</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================
+// 1. CONFIGURATION
+// ============================================
+const API_BASE = ""; // Change this if your API is on a different port/domain
+
+let shopsCache = [];
+let filteredCache = [];
+
+function esc(t){
+  if(!t) return "";
+  return String(t).replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m]));
+}
+
+// ---------------------------------------------
+// FIX: Robust Image Path Resolver
+// ---------------------------------------------
+function resolveUrl(path) {
+    if (!path) return "https://via.placeholder.com/80?text=No+Img";
+    if (path.startsWith("http") || path.startsWith("data:")) return path;
+
+    if (!path.startsWith("/")) {
+        path = "/" + path;
+    }
+
+    return path;
+}
+
+
+// ============================================
+// 2. API WRAPPER
+// ============================================
+async function api(path, opts={}){
+  const url = path.startsWith("http") ? path : API_BASE + path;
+  try {
+    let r = await fetch(url, opts);
+    let j = await r.json();
+    return { ok: r.ok, json: j };
+  } catch(e) {
+    console.error("API Error:", e);
+    return { ok: false, json: null };
+  }
+}
+
+// ============================================
+// 3. AUTOCOMPLETE LOGIC
+// ============================================
+
+// --- CITY SEARCH ---
+let cityTimeout = null;
+async function searchCity(query){
+    const box = document.getElementById("citySuggestions");
+    if(cityTimeout) clearTimeout(cityTimeout);
+
+    if(query.length < 2) {
+        box.style.display = "none";
+        return;
+    }
+
+    cityTimeout = setTimeout(async () => {
+        let r = await api(`/city/search/?city_name=${query}`);
+        box.innerHTML = "";
+        if(r.ok && r.json.data && r.json.data.length > 0){
+            box.style.display = "block";
+            r.json.data.forEach(city => {
+                let div = document.createElement("div");
+                div.className = "suggestion-item";
+                div.innerHTML = `<b>${city.city_name}</b> <span class="sm">(${city.district})</span>`;
+                div.onclick = () => selectCity(city);
+                box.appendChild(div);
+            });
+        } else {
+            box.style.display = "none";
+        }
+    }, 300);
+}
+
+// ---------------------------------------------
+// FIX: Pincode Auto-Fill
+// ---------------------------------------------
+function selectCity(city){
+    document.getElementById("cityInput").value = city.city_name;
+    document.getElementById("districtInput").value = city.district || "";
+    document.getElementById("stateInput").value = city.state || "";
+
+    // Pincode Fix: Set to correct ID
+    if(city.pincode) {
+        document.getElementById("pincodeInput").value = city.pincode;
+    } else {
+        document.getElementById("pincodeInput").value = "";
+    }
+
+    document.getElementById("citySuggestions").style.display = "none";
+}
+
+// --- CATEGORY SEARCH ---
+let catTimeout = null;
+async function searchCategory(query){
+    const box = document.getElementById("catSuggestions");
+    let terms = query.split(",");
+    let currentTerm = terms[terms.length - 1].trim();
+
+    if(catTimeout) clearTimeout(catTimeout);
+
+    if(currentTerm.length < 2) {
+        box.style.display = "none";
+        return;
+    }
+
+    catTimeout = setTimeout(async () => {
+        let r = await api(`/category/search/?category=${currentTerm}`);
+        box.innerHTML = "";
+        if(r.ok && r.json.data && r.json.data.length > 0){
+            box.style.display = "block";
+            r.json.data.forEach(cat => {
+                let div = document.createElement("div");
+                div.className = "suggestion-item";
+                div.innerText = cat.name;
+                div.onclick = () => selectCategory(cat.name);
+                box.appendChild(div);
+            });
+        } else {
+            box.style.display = "none";
+        }
+    }, 300);
+}
+
+function selectCategory(name){
+    let input = document.getElementById("catInput");
+    let val = input.value;
+    let terms = val.split(",");
+    terms.pop();
+    terms.push(" " + name);
+    input.value = terms.join(",") + ", ";
+    document.getElementById("catSuggestions").style.display = "none";
+    input.focus();
+}
+
+document.addEventListener("click", function(e){
+    if(!e.target.closest(".autocomplete-wrap")){
+        document.getElementById("citySuggestions").style.display = "none";
+        document.getElementById("catSuggestions").style.display = "none";
+    }
+});
+
+
+// ============================================
+// 4. LOAD & RENDER SHOPS
+// ============================================
+async function loadShops(){
+  const tbody = document.getElementById("shopsTbody");
+  tbody.innerHTML = "<tr><td colspan='4' style='text-align:center'>Loading data...</td></tr>";
+
+  let r = await api("/shops/all/");
+
+  if(!r.json || !r.json.status){
+    tbody.innerHTML = "<tr><td colspan='4' style='color:red'>Failed to load data. Check backend.</td></tr>";
+    return;
+  }
+
+  shopsCache = r.json.data;
+  filteredCache = shopsCache;
+  renderShops();
+}
+
+// ---------------------------------------------
+// FIX: Image Structure Mapping in Table
+// ---------------------------------------------
+function renderShops(){
+  const tbody = document.getElementById("shopsTbody");
+  tbody.innerHTML = "";
+
+  if(filteredCache.length === 0){
+    tbody.innerHTML = "<tr><td colspan='4' style='text-align:center'>No shops found.</td></tr>";
+    return;
+  }
+
+  filteredCache.forEach(s => {
+    let shopId = s.shop_id || s._id;
+
+    // --- FIX: Extract Main Image from images[] ---
+    let imgList = s.images || [];
+    let mainObj = imgList.find(i => i.type === 'main');
+
+    // Use found main url, or first image, or null
+    let imgPath = mainObj ? mainObj.url : (imgList.length > 0 ? imgList[0].url : null);
+
+    let imgTag = `<img src="${resolveUrl(imgPath)}" class="shop-mini-img">`;
+
+    let cityName = s.city ? s.city.city_name : "-";
+    let ownerName = s.user ? (s.user.name || s.user.phonenumber) : "Unknown";
+
+    let tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>
+        <div style="display:flex;align-items:center">
+            ${imgTag}
+            <div>
+                <b>${esc(s.shop_name)}</b><br>
+                <span class="sm">${esc((s.categories||[]).map(c=>c.name).join(", "))}</span>
+            </div>
+        </div>
+      </td>
+      <td>${esc(ownerName)}<br><span class="sm">${esc(s.phone_number)}</span></td>
+      <td>${esc(cityName)}</td>
+      <td>
+        <div style="display:flex; gap:6px; flex-wrap:wrap">
+              <button class="btn btn-info" onclick="goToOffers('${shopId}')">Offers</button>
+              <button class="btn btn-primary" onclick="goToReviews('${shopId}')">Reviews</button>
+              <button class="btn btn-muted" onclick="openEdit('${shopId}')">Edit</button>
+              <button class="btn btn-danger" onclick="deleteShop('${shopId}')">Del</button>
+        </div>
+      </td>
+
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function filterShops(){
+  let q = document.getElementById("shopSearch").value.toLowerCase();
+  filteredCache = shopsCache.filter(s => {
+    return (s.shop_name && s.shop_name.toLowerCase().includes(q));
+  });
+  renderShops();
+}
+
+function goToReviews(id){
+    window.location.href = `admin_reviews?shop_id=${id}`;
+}
+
+function goToOffers(id){
+    window.location.href = `admin_offers?shop_id=${id}`;
+}
+
+
+let addShopGalleryFiles = [];
+
+function previewMainImg(input, imgId) {
+    if (input.files && input.files[0]) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById(imgId).src = e.target.result;
+        }
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+document.getElementById("add_photos").addEventListener("change", e => {
+  addShopGalleryFiles.push(...e.target.files);
+  renderAddPhotoPreview();
+});
+
+function renderAddPhotoPreview(){
+  let box = document.getElementById("add_photos_preview");
+  box.innerHTML = "";
+  addShopGalleryFiles.forEach((file,i)=>{
+    let reader = new FileReader();
+    reader.onload = e => {
+      box.innerHTML += `
+        <div class="photo-box">
+          <img src="${e.target.result}" class="photo-thumb">
+          <button class="photo-del" type="button" onclick="removeAddPhoto(${i})">×</button>
+        </div>`;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+function removeAddPhoto(i){
+  addShopGalleryFiles.splice(i,1);
+  renderAddPhotoPreview();
+}
+
+async function addShop(){
+  let form = document.getElementById("addShopForm");
+  let fd = new FormData(form);
+  addShopGalleryFiles.forEach(f => fd.append("photos", f));
+
+  let r = await api("/add_shop_custom/", { method:"POST", body:fd });
+  alert(r.json?.message || "Processed");
+
+  if(r.ok){
+      addShopGalleryFiles = [];
+      form.reset();
+      document.getElementById("main_preview_add").src = "https://via.placeholder.com/60?text=None";
+      renderAddPhotoPreview();
+      loadShops();
+  }
+}
+
+
+function openEdit(id){
+  let item = shopsCache.find(x => String(x.shop_id) === String(id));
+  if(!item) { alert("Shop data not found."); return; }
+
+  // Populate Text Fields
+  document.getElementById("edit_shop_id").value = item.shop_id;
+  document.getElementById("edit_shop_name").value = item.shop_name || "";
+  document.getElementById("edit_description").value = item.description || "";
+  document.getElementById("edit_phone").value = item.phone_number || "";
+  document.getElementById("edit_email").value = item.email || "";
+  document.getElementById("edit_address").value = item.address || "";
+  document.getElementById("edit_landmark").value = item.landmark || "";
+  document.getElementById("edit_city_name").value = item.city ? item.city.city_name : "";
+  document.getElementById("edit_keywords").value = (item.keywords || []).join(", ");
+
+  let allImages = item.images || [];
+
+  let mainObj = allImages.find(i => i.type === 'main');
+  let mainPath = mainObj ? mainObj.url : null;
+  document.getElementById("edit_preview_main").src = resolveUrl(mainPath);
+
+  let area = document.getElementById("edit_photos_area");
+  area.innerHTML = "";
+
+  let galleryFound = false;
+
+  allImages.forEach((imgObj, originalIndex) => {
+      // Check if it is a gallery image
+      if(imgObj.type === "image") {
+         galleryFound = true;
+         area.innerHTML += `
+            <div class="photo-box">
+              <img src="${resolveUrl(imgObj.url)}" class="photo-thumb">
+              <button class="photo-del" onclick="deletePhoto('${item.shop_id}', ${originalIndex})">×</button>
+            </div>`;
+      }
+  });
+
+  if(!galleryFound) {
+      area.innerHTML = "<span class='sm' style='padding:10px'>No gallery images found</span>";
+  }
+
+  document.getElementById("editBackdrop").style.display = "flex";
+}
+
+async function saveEdit(){
+  let shopId = document.getElementById("edit_shop_id").value;
+  let fd = new FormData();
+
+  fd.append("shop_id", shopId);
+  fd.append("shop_name", document.getElementById("edit_shop_name").value);
+  fd.append("description", document.getElementById("edit_description").value);
+  fd.append("phone_number", document.getElementById("edit_phone").value);
+  fd.append("email", document.getElementById("edit_email").value);
+  fd.append("address", document.getElementById("edit_address").value);
+  fd.append("landmark", document.getElementById("edit_landmark").value);
+  fd.append("city_name", document.getElementById("edit_city_name").value);
+  fd.append("keywords", document.getElementById("edit_keywords").value);
+
+  // Main Image
+  let mainInput = document.getElementById("edit_main_image");
+  if(mainInput.files.length > 0){
+      fd.append("main_image", mainInput.files[0]);
+  }
+
+  // Gallery Images
+  let galleryInput = document.getElementById("edit_new_photos");
+  for(let i=0; i<galleryInput.files.length; i++){
+      fd.append("photos", galleryInput.files[i]);
+  }
+
+  let r = await api("/update_shop/", { method:"POST", body:fd });
+  alert(r.json?.message || "Updated");
+
+  if(r.ok){
+      closeEdit();
+      loadShops();
+  }
+}
+
+async function deletePhoto(shopId, idx){
+  if(!confirm("Delete this gallery photo?")) return;
+  let fd = new FormData();
+  fd.append("shop_id", shopId);
+  fd.append("photo_index", idx);
+
+  let r = await api("/shop/photo/delete/", { method:"POST", body:fd });
+  if(r.ok){
+      await loadShops();
+      setTimeout(() => openEdit(shopId), 500);
+  } else {
+      alert("Failed: " + (r.json?.message || "Error"));
+  }
+}
+
+function closeEdit(){
+    document.getElementById("editBackdrop").style.display = "none";
+    document.getElementById("edit_main_image").value = "";
+    document.getElementById("edit_new_photos").value = "";
+}
+
+async function deleteShop(id){
+  if(!confirm("Delete this shop completely?")) return;
+  let r = await api(`/shops/delete/${id}`, { method:"DELETE" });
+  alert(r.json?.message || "Deleted");
+  if(r.ok) loadShops();
+}
+
+function deleteShopFromModal(){
+    let id = document.getElementById("edit_shop_id").value;
+    if(id) { deleteShop(id); closeEdit(); }
+}
+
+// Initial Load
+loadShops();
+</script>
+</body>
+</html>

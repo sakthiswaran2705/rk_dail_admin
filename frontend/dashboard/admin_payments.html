@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Admin · Active Payments</title>
+
+<style>
+body{font-family:Arial;background:#f6f8fb;padding:20px}
+.card{background:#fff;padding:20px;border-radius:10px;box-shadow: 0 2px 5px rgba(0,0,0,0.05);}
+
+/* Updated Header Styles */
+.header-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
+.header-left{display:flex;align-items:center;gap:15px} /* Wrapper for Button + Title */
+
+.btn-back {
+    background-color: #6c757d;
+    color: white !important; /* Force white text over general link styles */
+    padding: 8px 15px;
+    border-radius: 5px;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: normal;
+}
+.btn-back:hover { background-color: #5a6268; text-decoration: none; }
+
+h2 { margin: 0; color: #333; }
+
+input[type="text"]{padding:10px;border:1px solid #ddd;border-radius:5px;width:300px;font-size:14px}
+table{width:100%;border-collapse:collapse;margin-top:15px}
+th,td{padding:12px 10px;border-bottom:1px solid #eee;text-align:left}
+th{background:#0b74de;color:white}
+.badge{padding:4px 8px;border-radius:6px;color:white;font-size:12px}
+.active{background:#28a745}
+tr:hover{background-color:#f9f9f9}
+a{color: #0b74de; text-decoration: none; font-weight: bold;}
+a:hover{text-decoration: underline;}
+</style>
+</head>
+
+<body>
+
+<div class="card">
+  <div class="header-row">
+    <div class="header-left">
+        <a href="/dashboard/admin" class="btn-back">← Back</a>
+        <h2>Active Payments</h2>
+    </div>
+
+    <input type="text" id="searchInput" placeholder="Search email, phone, or plan..." onkeyup="filterTable()">
+  </div>
+
+  <table>
+  <thead>
+  <tr>
+    <th>User</th>
+    <th>Plan</th>
+    <th>Amount</th>
+    <th>Status</th>
+    <th>Expiry</th>
+  </tr>
+  </thead>
+  <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<script>
+const API = ""; // Enter your API URL here (e.g., http://0.0.0.0:8000)
+let allData = []; // Store data here for searching
+
+async function loadActive(){
+  try {
+    let res = await fetch(`${API}/admin/payments/active/`);
+    let json = await res.json();
+
+    // Store data globally so we can filter it without calling API again
+    allData = json.data;
+    renderTable(allData);
+
+  } catch(err) {
+    console.error("Error loading data", err);
+  }
+}
+
+function renderTable(data){
+  const body = document.getElementById("tbody");
+  body.innerHTML = "";
+
+  if(data.length === 0){
+    body.innerHTML = "<tr><td colspan='5' style='text-align:center'>No records found</td></tr>";
+    return;
+  }
+
+  data.forEach(p=>{
+    let user = p.email !== "-" ? p.email : p.phone;
+
+    let tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><a href="payment_history?q=${encodeURIComponent(user)}">${user}</a></td>
+      <td>${p.plan_name}</td>
+      <td>₹${p.amount}</td>
+      <td><span class="badge active">active</span></td>
+      <td>${new Date(p.expiry_date).toLocaleDateString()}</td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
+// Search Function
+function filterTable(){
+  const query = document.getElementById("searchInput").value.toLowerCase();
+
+  const filtered = allData.filter(item => {
+    let user = item.email !== "-" ? item.email : item.phone;
+    return user.toLowerCase().includes(query) ||
+           item.plan_name.toLowerCase().includes(query);
+  });
+
+  renderTable(filtered);
+}
+
+loadActive();
+</script>
+
+</body>
+</html>

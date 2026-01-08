@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Category Manager</title>
+   <style>
+    body {
+        font-family: Arial;
+        background: #f4f4f4;
+        padding: 20px;
+        position: relative;
+    }
+
+    .back-btn {
+        background:#6c757d;
+        color:white;
+        padding:6px 14px;
+        border-radius:6px;
+        font-size:14px;
+        text-decoration:none;
+        font-weight:600;
+        display:inline-block;
+    }
+    .back-btn:hover {
+        background:#5a6268;
+    }
+
+    .box {
+        width: 450px;
+        background: white;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px #ccc;
+    }
+
+    input, button, select {
+        width: 100%;
+        padding: 10px;
+        margin-top: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+    }
+
+    button {
+        cursor: pointer;
+        background: #007bff;
+        color: white;
+    }
+
+    button:hover {
+        background: #0056b3;
+    }
+
+    .delete-btn {
+        background: #dc3545;
+    }
+
+    .delete-btn:hover {
+        background: #a71d2a;
+    }
+
+    .preview img {
+        width: 80px;
+        margin: 5px;
+        border-radius: 5px;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+        background: white;
+    }
+
+    th, td {
+        padding: 10px;
+        border: 1px solid #ddd;
+    }
+
+    th {
+        background: #333;
+        color: white;
+    }
+</style>
+
+</head>
+<body>
+
+<h1>Category Manager</h1>
+<a href="admin" class="back-btn">⬅ Back</a>
+
+<!-- ADD CATEGORY -->
+<div class="box">
+    <h3>Add Category</h3>
+
+    <form id="addForm" enctype="multipart/form-data">
+        <input type="text" name="name" id="addName" placeholder="Category Name" required>
+        <input type="file" id="addPhoto" name="photo" accept="image/*" required>
+        <div id="addPreview" class="preview"></div>
+        <button type="submit">Add Category</button>
+    </form>
+
+    <p id="addMsg"></p>
+</div>
+
+<!-- UPDATE CATEGORY -->
+<div class="box">
+    <h3>Update Category</h3>
+
+    <select id="updateSelect">
+        <option value="">-- Select Category --</option>
+    </select>
+
+    <input type="text" id="newName" placeholder="New Name (optional)">
+    <input type="file" id="updatePhoto" accept="image/*">
+    <div id="updatePreview" class="preview"></div>
+
+    <button onclick="updateCategory()">Update</button>
+    <p id="updateMsg"></p>
+</div>
+
+<!-- DELETE CATEGORY -->
+<div class="box">
+    <h3>Delete Category</h3>
+
+    <select id="deleteSelect">
+        <option value="">-- Select Category --</option>
+    </select>
+
+    <button class="delete-btn" onclick="deleteCategory()">Delete</button>
+    <p id="deleteMsg"></p>
+</div>
+
+<!-- CATEGORY TABLE -->
+<h2>All Categories</h2>
+<table id="catTable">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Image</th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<script>
+
+// ⚠️ SAME DOMAIN
+const BASE_URL = "";
+// If backend is different:
+// const BASE_URL = "http://127.0.0.1:8000";
+
+// PREVIEW ADD
+document.getElementById("addPhoto").addEventListener("change", function () {
+    let preview = document.getElementById("addPreview");
+    preview.innerHTML = "";
+    if (this.files[0]) {
+        let img = document.createElement("img");
+        img.src = URL.createObjectURL(this.files[0]);
+        preview.appendChild(img);
+    }
+});
+
+// PREVIEW UPDATE
+document.getElementById("updatePhoto").addEventListener("change", function () {
+    let preview = document.getElementById("updatePreview");
+    preview.innerHTML = "";
+    if (this.files[0]) {
+        let img = document.createElement("img");
+        img.src = URL.createObjectURL(this.files[0]);
+        preview.appendChild(img);
+    }
+});
+
+// ADD CATEGORY
+document.getElementById("addForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    let fd = new FormData();
+    fd.append("name", document.getElementById("addName").value.toLowerCase());
+    fd.append("photo", document.getElementById("addPhoto").files[0]);
+
+    let res = await fetch("/category/add/", { method: "POST", body: fd });
+    let out = await res.json();
+
+    document.getElementById("addMsg").innerText = out.message;
+    loadCategories();
+});
+
+// UPDATE CATEGORY
+async function updateCategory() {
+    let id = document.getElementById("updateSelect").value;
+    if (!id) return alert("Select a category!");
+
+    let fd = new FormData();
+    fd.append("category_id", id);
+
+    let newName = document.getElementById("newName").value;
+    if (newName) fd.append("name", newName.toLowerCase());
+
+    let img = document.getElementById("updatePhoto").files[0];
+    if (img) fd.append("photo", img);
+
+    let res = await fetch("/category/update/", { method: "POST", body: fd });
+    let out = await res.json();
+
+    document.getElementById("updateMsg").innerText = out.message;
+    loadCategories();
+}
+
+// DELETE CATEGORY
+async function deleteCategory() {
+    let id = document.getElementById("deleteSelect").value;
+    if (!id) return alert("Select a category!");
+
+    let fd = new FormData();
+    fd.append("category_id", id);
+
+    let res = await fetch("/category/delete/", { method: "POST", body: fd });
+    let out = await res.json();
+
+    document.getElementById("deleteMsg").innerText = out.message;
+    loadCategories();
+}
+
+// LOAD CATEGORIES
+async function loadCategories() {
+    let res = await fetch("/category/all/");
+    let out = await res.json();
+    let data = out.categories || [];
+
+    let table = document.querySelector("#catTable tbody");
+    let updSel = document.getElementById("updateSelect");
+    let delSel = document.getElementById("deleteSelect");
+
+    table.innerHTML = "";
+    updSel.innerHTML = "<option value=''>-- Select Category --</option>";
+    delSel.innerHTML = "<option value=''>-- Select Category --</option>";
+
+    data.forEach(cat => {
+        updSel.innerHTML += `<option value="${cat._id}">${cat.name}</option>`;
+        delSel.innerHTML += `<option value="${cat._id}">${cat.name}</option>`;
+
+        let imgHtml = cat.category_image
+            ? `<img src="${BASE_URL}/${cat.category_image}" width="60">`
+            : "";
+
+        table.innerHTML += `
+            <tr>
+                <td>${cat.name}</td>
+                <td>${imgHtml}</td>
+            </tr>
+        `;
+    });
+}
+
+loadCategories();
+
+</script>
+
+</body>
+</html>

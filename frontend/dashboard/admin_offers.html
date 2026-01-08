@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>Shop Offers</title>
+
+<script>
+window.APP_SETTINGS = {
+    MAX_IMAGE_BYTES: 500 * 1024,
+    MAX_VIDEO_BYTES: 2 * 1024 * 1024,
+    IMAGE_LIMIT_TEXT: "❌ Image size must be ≤ 500KB",
+    VIDEO_LIMIT_TEXT: "❌ Video size must be ≤ 2MB"
+};
+</script>
+
+<style>
+body{font-family:Arial;background:#f5f6fa;margin:0;padding:20px}
+.box{background:#fff;padding:18px;border-radius:8px;max-width:900px;margin:auto;box-shadow:0 4px 12px rgba(0,0,0,0.08)}
+.offer-card{border:1px solid #eee;padding:12px;border-radius:8px;margin-bottom:14px}
+.btn{padding:6px 12px;border-radius:5px;cursor:pointer;border:0;font-weight:bold}
+.btn-danger{background:#e74c3c;color:#fff}
+.btn-edit{background:#3498db;color:#fff}
+.btn-add{background:#2ecc71;color:#fff;margin-bottom:15px}
+.back{background:#34495e;color:white;text-decoration:none;padding:8px 14px;border-radius:5px;display:inline-block;margin-bottom:14px}
+.title{font-size:20px;font-weight:bold;margin-bottom:10px}
+.modal-bg{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);display:none;justify-content:center;align-items:center;}
+.modal{background:white;padding:20px;border-radius:8px;width:420px;}
+.input{width:100%;padding:10px;margin-bottom:10px;border-radius:6px;border:1px solid #ccc;}
+</style>
+</head>
+<body>
+
+<a href="all_shop" class="back">⬅ Back</a>
+
+<div class="box">
+  <div class="title">Shop Offers</div>
+  <div id="shopInfo"></div>
+  <hr>
+  <button class="btn btn-add" onclick="openAddModal()">+ Add New Offer</button>
+  <div id="offersList">Loading...</div>
+</div>
+
+<div class="modal-bg" id="offerModal">
+  <div class="modal">
+    <h3 id="modalTitle">Edit Offer</h3>
+    <input type="hidden" id="offer_id">
+    <input id="title" class="input" placeholder="Title">
+    <input id="fee" class="input" placeholder="Fee">
+    <input id="percentage" class="input" placeholder="Percentage (%)">
+    <input id="start_date" class="input" placeholder="Start Date (yyyy-mm-dd)">
+    <input id="end_date" class="input" placeholder="End Date (yyyy-mm-dd)">
+    <textarea id="description" class="input" placeholder="Description"></textarea>
+    <label>File (leave empty to keep same file)</label>
+    <input type="file" id="file" class="input">
+    <button class="btn btn-edit" onclick="saveOffer()">Save</button>
+    <button class="btn btn-danger" onclick="closeModal()">Cancel</button>
+  </div>
+</div>
+
+<script>
+// ==========================================
+// 1. SET YOUR FASTAPI URL HERE (IMPORTANT)
+// ==========================================
+const API = "";
+
+const urlParams = new URLSearchParams(window.location.search);
+const shopId = urlParams.get("shop_id");
+
+// Basic Check
+if (!shopId) {
+  document.getElementById("offersList").innerHTML = "❌ Error: No shop_id in URL query string.";
+} else {
+  loadOffers();
+}
+
+/* -------------------- LOAD OFFERS -------------------- */
+async function loadOffers() {
+  try {
+    // Fetch ALL shops
+    let res = await fetch(API + "/shops/all/");
+
+    if (!res.ok) {
+        throw new Error(`Server returned ${res.status}`);
+    }
+
+    let data = await res.json(); // Assuming returns List[Shop] or {data: [...]}
+
+    // Handle if your API wraps list in a "data" key or returns list directly
+    const shops = Array.isArray(data) ? data : (data.data || []);
+
+    // FILTER: Find the specific shop using the ID from URL
+    // We check 'shop_id' or '_id' or 'shop._id' to be safe
+    const shop = shops.find(s => {
+        // Option A: Structure is { shop_id: "..." }
+        if (s.shop_id === shopId) return true;
+        // Option B: Structure is { shop: { _id: "..." } } (Nested)
+        if (s.shop && s.shop._id === shopId) return true;
+        // Option C: Structure is { _id: "..." }
+        if (s._id === shopId) return true;
+
+        return false;
+    });
+
+    if (!shop) {
+      console.log("Available IDs:", shops.map(s => s.shop_id || s._id)); // Debugging help
+      document.getElementById("offersList").innerHTML = `❌ Shop ID '${shopId}' not found in database.`;
+      return;
+    }
+
+    // Determine name/owner based on your structure
+    // If structure is flat: shop.shop_name. If nested: shop.shop.shop_name
+    const sName = shop.shop_name || (shop.shop ? shop.shop.shop_name : "Unknown");
+
+    document.getElementById("shopInfo").innerHTML = `
+        <b>Shop:</b> ${sName} <br>
+        <b>ID:</b> ${shopId} <br><br>
+    `;
+
+    // Render offers (Check if offers is a direct list or nested)
+    const offers = shop.offers || (shop.shop ? shop.shop.offers : []);
+    renderOffers(offers || []);
+
+  } catch (err) {
+    console.error(err);
+    document.getElementById("offersList").innerHTML = "❌ Error loading data. Is Backend running on port 8000?";
+  }
+}
+
+/* -------------------- RENDER OFFERS -------------------- */
+function renderOffers(list) {
+  const box = document.getElementById("offersList");
+  if (!list || !list.length) {
+    box.innerHTML = "No offers found for this shop.";
+    return;
+  }
+
+  box.innerHTML = "";
+
+  list.forEach(off => {
+    let wrapper = document.createElement("div");
+    wrapper.className = "offer-card";
+
+    // Handle missing images safely
+    let imgSource = off.image_b64 || "";
+    let media = "";
+
+    if (imgSource) {
+        media = (off.file_type === "video") ?
+        `<video src="${imgSource}" controls style="max-width:260px;border-radius:6px"></video>` :
+        `<img src="${imgSource}" style="max-width:260px;border-radius:6px"/>`;
+    }
+
+    wrapper.innerHTML = `
+      ${media}
+      <br><br>
+      <b>Title:</b> ${off.title || "-"}<br>
+      <b>Fee:</b> ${off.fee || "-"}<br>
+      <b>Percentage:</b> ${off.percentage || "-"}<br>
+      <b>Description:</b> ${off.description || "-"}<br>
+      <b>Date:</b> ${off.start_date || "-"} → ${off.end_date || "-"}<br><br>
+
+      <button class="btn btn-edit" onclick="openEditModal(${JSON.stringify(off).replace(/"/g,'&quot;')})">Edit</button>
+      <button class="btn btn-danger" onclick="deleteOffer('${off.id}')">Delete</button>
+    `;
+
+    box.appendChild(wrapper);
+  });
+}
+
+/* -------------------- DELETE OFFER -------------------- */
+async function deleteOffer(id) {
+  if (!confirm("Delete this offer?")) return;
+
+  let fd = new FormData();
+  fd.append("offer_id", id);
+
+  try {
+    let res = await fetch(API + "/delete_offer_custom/", {
+        method: "POST",
+        body: fd
+    });
+    let data = await res.json();
+    alert(data.message || "Deleted");
+    loadOffers(); // Reload
+  } catch (e) {
+    alert("Error deleting");
+  }
+}
+
+/* -------------------- MODAL & SAVE FUNCTIONS -------------------- */
+function openEditModal(off) {
+  document.getElementById("modalTitle").innerText = "Edit Offer";
+  document.getElementById("offer_id").value = off.id;
+  document.getElementById("title").value = off.title || "";
+  document.getElementById("fee").value = off.fee || "";
+  document.getElementById("percentage").value = off.percentage || "";
+  document.getElementById("start_date").value = off.start_date || "";
+  document.getElementById("end_date").value = off.end_date || "";
+  document.getElementById("description").value = off.description || "";
+  document.getElementById("offerModal").style.display = "flex";
+}
+
+function openAddModal() {
+  document.getElementById("modalTitle").innerText = "Add New Offer";
+  document.getElementById("offer_id").value = ""; // Empty ID means new
+  document.getElementById("title").value = "";
+  document.getElementById("fee").value = "";
+  document.getElementById("percentage").value = "";
+  document.getElementById("start_date").value = "";
+  document.getElementById("end_date").value = "";
+  document.getElementById("description").value = "";
+  document.getElementById("offerModal").style.display = "flex";
+}
+
+function validateFile(file) {
+  if (!file) return { ok: true };
+  const S = window.APP_SETTINGS;
+  if (file.type.startsWith("image/")) {
+    if (file.size > S.MAX_IMAGE_BYTES) return { ok: false, msg: S.IMAGE_LIMIT_TEXT };
+  } else if (file.type.startsWith("video/")) {
+    if (file.size > S.MAX_VIDEO_BYTES) return { ok: false, msg: S.VIDEO_LIMIT_TEXT };
+  } else {
+    return { ok: false, msg: "❌ Only image or video allowed" };
+  }
+  return { ok: true };
+}
+
+async function saveOffer() {
+  let id = document.getElementById("offer_id").value;
+  let file = document.getElementById("file").files[0];
+
+  let check = validateFile(file);
+  if (!check.ok) { alert(check.msg); return; }
+
+  let fd = new FormData();
+  fd.append("phoneid", "admin@test.com");
+  fd.append("target_shop", shopId); // Use the shopId from URL
+
+  // If editing, you might need to send the offer ID
+  if(id) fd.append("offer_id", id);
+
+  fd.append("title", document.getElementById("title").value);
+  fd.append("fee", document.getElementById("fee").value);
+  fd.append("percentage", document.getElementById("percentage").value);
+  fd.append("start_date", document.getElementById("start_date").value);
+  fd.append("end_date", document.getElementById("end_date").value);
+  fd.append("description", document.getElementById("description").value);
+
+  if (file) fd.append("file", file);
+
+  // Switch endpoint based on Edit or Add if necessary,
+  // or handle both in one backend endpoint.
+  let endpoint = id ? "/edit_offer_custom/" : "/add_offer_custom/";
+
+  // Note: user provided only /add_offer_custom/ in example, assuming it handles update or add
+  // If not, revert to just one endpoint:
+  endpoint = "/add_offer_custom/";
+
+  try {
+      let res = await fetch(API + endpoint, {
+        method: "POST",
+        body: fd
+      });
+      let data = await res.json();
+      alert(data.message || "Saved");
+      closeModal();
+      loadOffers();
+  } catch(e) {
+      alert("Error saving offer");
+  }
+}
+
+function closeModal(){
+  document.getElementById("offerModal").style.display="none";
+}
+</script>
+
+</body>
+</html>

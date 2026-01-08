@@ -22,7 +22,7 @@ client = AsyncIOMotorClient(Config.MONGO_HOST)
 db = client[Config.DB_NAME]
 
 # Setup collection
-collection_users = db["users"]
+collection_users = db["admin"]
 collection_config = db["configurations"]
 collection_webdata = db["webdatas"]
 

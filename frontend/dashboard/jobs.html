@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Job Manager</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+
+        /* Updated Header to accommodate Back Button */
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #f0f0f0; padding-bottom: 15px; }
+        .header-left { display: flex; align-items: center; gap: 15px; } /* New wrapper for Back + Title */
+
+        h1 { margin: 0; font-size: 24px; color: #2c3e50; }
+
+        .filter-bar { display: flex; gap: 15px; background: #eef2f7; padding: 15px; border-radius: 8px; margin-bottom: 20px; flex-wrap: wrap;}
+        .filter-input { flex: 1; min-width: 200px; padding: 10px; border: 1px solid #ccc; border-radius: 6px; outline: none; }
+        .filter-input:focus { border-color: #3498db; box-shadow: 0 0 5px rgba(52,152,219,0.2); }
+
+        .btn { padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; transition: 0.2s; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-success { background: #2ecc71; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-secondary { background: #95a5a6; color: white; }
+        .btn:hover { opacity: 0.9; }
+
+        .job-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+        .job-card { background: #fff; border: 1px solid #e1e4e8; border-radius: 8px; padding: 20px; position: relative; transition: transform 0.2s; }
+        .job-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.05); border-color: #3498db; }
+
+        .job-title { font-size: 18px; font-weight: bold; margin-bottom: 5px; color: #2c3e50; }
+        .job-salary { color: #27ae60; font-weight: bold; font-size: 15px; margin-bottom: 10px; }
+        .job-meta { font-size: 13px; color: #7f8c8d; margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
+        .tag { background: #f0f2f5; padding: 3px 8px; border-radius: 4px; border: 1px solid #ddd; }
+        .job-desc { font-size: 14px; color: #555; line-height: 1.5; margin-bottom: 15px; height: 60px; overflow: hidden; text-overflow: ellipsis; }
+
+        .card-actions { border-top: 1px solid #eee; padding-top: 15px; display: flex; gap: 10px; }
+        .card-actions button { flex: 1; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal { background: white; width: 500px; max-width: 90%; padding: 25px; border-radius: 10px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .modal-title { font-size: 20px; font-weight: bold; margin-bottom: 20px; }
+
+        .form-group { margin-bottom: 15px; position: relative; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 13px; color: #555; }
+        .form-control { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; box-sizing: border-box; }
+        .form-row { display: flex; gap: 15px; }
+        .form-row .form-group { flex: 1; }
+
+        .city-dropdown-wrapper { position: relative; }
+        .city-dropdown-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ccc;
+            border-top: none;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1001;
+            border-radius: 0 0 5px 5px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: none;
+        }
+        .city-option { padding: 10px; cursor: pointer; border-bottom: 1px solid #f0f0f0; }
+        .city-option:hover { background-color: #f0f8ff; color: #3498db; }
+        .city-option.no-result { color: #999; cursor: default; }
+
+        .alert { padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none; }
+        .alert-error { background: #fadbd8; color: #721c24; border: 1px solid #f5c6cb; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <div class="header-left">
+            <a href="/dashboard/admin" class="btn btn-secondary">← Back</a>
+            <h1>Admin Job Panel</h1>
+        </div>
+
+        <button class="btn btn-success" onclick="openAddModal()">+ Add New Job</button>
+    </div>
+
+    <div class="filter-bar">
+        <input type="text" id="searchTitle" class="filter-input" placeholder="🔍 Search Job Title..." onkeyup="filterJobs()">
+        <input type="text" id="searchCity" class="filter-input" placeholder="🏙️ Filter by City..." onkeyup="filterJobs()">
+    </div>
+
+    <div id="loading" style="text-align:center; color:#777; padding:20px;">Loading jobs...</div>
+    <div id="jobList" class="job-grid"></div>
+</div>
+
+<div class="modal-overlay" id="jobModal">
+    <div class="modal">
+        <div class="modal-title" id="modalTitle">Add New Job</div>
+        <div class="alert alert-error" id="errorBox"></div>
+
+        <input type="hidden" id="job_id">
+
+        <div class="form-group" id="ownerFieldContainer" style="background: #fdf2ce; padding: 10px; border-radius: 5px; border: 1px solid #f0e68c;">
+            <label>User Phone / Email ID (Owner)</label>
+            <input type="text" id="phoneid" class="form-control" placeholder="e.g. 9876543210" value="admin@test.com">
+        </div>
+
+        <div class="form-group">
+            <label>Job Title</label>
+            <input type="text" id="job_title" class="form-control" placeholder="e.g. Sales Executive">
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Salary (Monthly)</label>
+                <input type="number" id="salary" class="form-control" placeholder="15000">
+            </div>
+
+            <div class="form-group city-dropdown-wrapper">
+                <label>Select City</label>
+                <input type="text" id="city_search_input" class="form-control" placeholder="Type to search city..." autocomplete="off" onkeyup="searchCitiesApi()">
+                <input type="hidden" id="city_id">
+                <div id="city_list" class="city-dropdown-list"></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Address</label>
+            <input type="text" id="address" class="form-control" placeholder="Street, Area, Landmark">
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Gender</label>
+                <select id="gender" class="form-control">
+                    <option value="Any">Any</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Experience</label>
+                <select id="experience" class="form-control">
+                    <option value="Fresher">Fresher</option>
+                    <option value="0-1 Years">0-1 Years</option>
+                    <option value="1-3 Years">1-3 Years</option>
+                    <option value="3+ Years">3+ Years</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Start Time</label>
+                <input type="time" id="work_start_time" class="form-control" value="09:00">
+            </div>
+            <div class="form-group">
+                <label>End Time</label>
+                <input type="time" id="work_end_time" class="form-control" value="18:00">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Description</label>
+            <textarea id="job_description" class="form-control" rows="3"></textarea>
+        </div>
+
+        <div style="text-align: right; margin-top: 20px;">
+            <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveJob()">Save Job</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_BASE = "http://0.0.0.0:8000"; // Updated to point to base
+    let allJobsData = [];
+    let searchTimer = null;
+
+    document.addEventListener("DOMContentLoaded", () => {
+        loadJobs();
+
+        // Close city dropdown if clicked outside
+        document.addEventListener("click", function(e) {
+            if (!e.target.closest('#city_search_input') && !e.target.closest('#city_list')) {
+                document.getElementById("city_list").style.display = 'none';
+            }
+        });
+    });
+
+    // --- CITY SEARCH API (For Modal) ---
+    function searchCitiesApi() {
+        const input = document.getElementById("city_search_input");
+        const list = document.getElementById("city_list");
+        const hiddenId = document.getElementById("city_id");
+
+        hiddenId.value = "";
+
+        const query = input.value.trim();
+        if (query.length === 0) {
+            list.style.display = "none";
+            return;
+        }
+
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(async () => {
+            try {
+                let res = await fetch(`${API_BASE}/city/search/?city_name=${encodeURIComponent(query)}`);
+                let json = await res.json();
+
+                list.innerHTML = "";
+                if (json.status && json.data.length > 0) {
+                    json.data.forEach(city => {
+                        const div = document.createElement("div");
+                        div.className = "city-option";
+                        div.innerText = `${city.city_name} - ${city.district}`;
+                        div.onclick = () => selectCity(city.id, city.city_name);
+                        list.appendChild(div);
+                    });
+                    list.style.display = "block";
+                } else {
+                    list.innerHTML = `<div class="city-option no-result">No city found</div>`;
+                    list.style.display = "block";
+                }
+            } catch (e) { console.error("City fetch error", e); }
+        }, 300);
+    }
+
+    function selectCity(id, name) {
+        document.getElementById("city_id").value = id;
+        document.getElementById("city_search_input").value = name;
+        document.getElementById("city_list").style.display = "none";
+    }
+
+    // --- LOAD JOBS ---
+    async function loadJobs() {
+        const loading = document.getElementById("loading");
+        try {
+            const res = await fetch(`${API_BASE}/jobs/all/`);
+            const json = await res.json();
+            loading.style.display = "none";
+            if (json.status && json.data) {
+                allJobsData = json.data;
+                renderJobs(allJobsData);
+            } else {
+                renderJobs([]);
+            }
+        } catch (e) {
+            loading.innerText = "Error loading jobs.";
+        }
+    }
+
+    // --- UPDATED FILTER LOGIC (Title AND City) ---
+    function filterJobs() {
+        const titleQuery = document.getElementById("searchTitle").value.toLowerCase();
+        const cityQuery = document.getElementById("searchCity").value.toLowerCase();
+
+        const filtered = allJobsData.filter(j => {
+            // Check matching Title
+            const matchTitle = (j.job_title || "").toLowerCase().includes(titleQuery);
+            // Check matching City
+            const matchCity = (j.city_name || "").toLowerCase().includes(cityQuery);
+
+            // Return true only if BOTH match
+            return matchTitle && matchCity;
+        });
+
+        renderJobs(filtered);
+    }
+
+    function renderJobs(jobs) {
+        const grid = document.getElementById("jobList");
+        grid.innerHTML = "";
+        if (jobs.length === 0) {
+            grid.innerHTML = "<p style='grid-column:1/-1;text-align:center'>No jobs found.</p>"; return;
+        }
+        jobs.forEach(job => {
+            grid.innerHTML += `
+                <div class="job-card">
+                    <div class="job-title">${job.job_title}</div>
+                    <div class="job-salary">₹ ${job.salary} / month</div>
+                    <div class="job-meta">
+                        <span class="tag">🏙️ ${job.city_name || "Unknown"}</span>
+                        <span class="tag">👤 ${job.gender}</span>
+                    </div>
+                    <div class="job-desc">${job.job_description}</div>
+                    <div class="card-actions">
+                        <button class="btn btn-primary" onclick="openEditModal('${job._id}')">Edit</button>
+                        <button class="btn btn-danger" onclick="deleteJob('${job._id}')">Delete</button>
+                    </div>
+                </div>`;
+        });
+    }
+
+    // --- DELETE ---
+    async function deleteJob(id) {
+        if(!confirm("Are you sure?")) return;
+        try {
+            let res = await fetch(`${API_BASE}/jobs/delete/${id}`, { method: 'DELETE' });
+            let json = await res.json();
+            if(json.status) loadJobs();
+            else alert(json.message);
+        } catch(e) { alert("Delete failed"); }
+    }
+
+    // --- OPEN MODAL LOGIC ---
+    function openAddModal() {
+        document.getElementById("modalTitle").innerText = "Add New Job";
+        document.getElementById("errorBox").style.display = "none";
+        document.getElementById("job_id").value = "";
+        document.getElementById("ownerFieldContainer").style.display = "block";
+
+        document.getElementById("phoneid").value = "";
+        document.getElementById("job_title").value = "";
+        document.getElementById("salary").value = "";
+        document.getElementById("address").value = "";
+        document.getElementById("job_description").value = "";
+        document.getElementById("city_id").value = "";
+        document.getElementById("city_search_input").value = "";
+        document.getElementById("work_start_time").value = "09:00";
+        document.getElementById("work_end_time").value = "18:00";
+
+        document.getElementById("jobModal").style.display = "flex";
+    }
+
+    function openEditModal(id){
+        let item = allJobsData.find(x => String(x._id) === String(id));
+        if(!item) { alert("Job data not found."); return; }
+
+        document.getElementById("modalTitle").innerText = "Edit Job";
+        document.getElementById("errorBox").style.display = "none";
+
+        document.getElementById("job_id").value = item._id;
+        document.getElementById("job_title").value = item.job_title || "";
+        document.getElementById("salary").value = item.salary || "";
+        document.getElementById("address").value = item.address || "";
+        document.getElementById("job_description").value = item.job_description || "";
+        document.getElementById("gender").value = item.gender || "Any";
+        document.getElementById("experience").value = item.experience || "Fresher";
+        document.getElementById("work_start_time").value = item.work_start_time || "09:00";
+        document.getElementById("work_end_time").value = item.work_end_time || "18:00";
+
+        document.getElementById("city_id").value = item.city_id || "";
+        document.getElementById("city_search_input").value = item.city_name || "";
+
+        document.getElementById("ownerFieldContainer").style.display = "none";
+        document.getElementById("jobModal").style.display = "flex";
+    }
+
+    function closeModal() {
+        document.getElementById("jobModal").style.display = "none";
+        document.getElementById("city_list").style.display = "none";
+    }
+
+    // --- SAVE LOGIC ---
+    async function saveJob(){
+        let id = document.getElementById("job_id").value;
+        let errorBox = document.getElementById("errorBox");
+        let fd = new FormData();
+
+        let isUpdate = !!id;
+
+        if(!isUpdate) {
+            let phone = document.getElementById("phoneid").value;
+            if(!phone.trim()){
+                 errorBox.innerText = "Owner Phone is required for new jobs";
+                 errorBox.style.display = "block";
+                 return;
+            }
+            fd.append("phoneid", phone);
+        }
+
+        fd.append("job_title", document.getElementById("job_title").value);
+        fd.append("salary", document.getElementById("salary").value);
+        fd.append("address", document.getElementById("address").value);
+        fd.append("gender", document.getElementById("gender").value);
+        fd.append("experience", document.getElementById("experience").value);
+        fd.append("work_start_time", document.getElementById("work_start_time").value);
+        fd.append("work_end_time", document.getElementById("work_end_time").value);
+        fd.append("job_description", document.getElementById("job_description").value);
+
+        let cityId = document.getElementById("city_id").value;
+        if(!cityId) {
+            errorBox.innerText = "Please select a valid city";
+            errorBox.style.display = "block";
+            return;
+        }
+        fd.append("city_id", cityId);
+
+        let url = isUpdate
+            ? `${API_BASE}/job/update/${id}/`
+            : `${API_BASE}/jobs/add/`;
+
+        try {
+            let r = await fetch(url, { method: "POST", body: fd });
+            let data = await r.json();
+
+            if (data.status) {
+                closeModal();
+                loadJobs();
+            } else {
+                errorBox.innerText = data.message || "Failed";
+                errorBox.style.display = "block";
+            }
+        } catch (e) {
+            console.error(e);
+            errorBox.innerText = "Network Error";
+            errorBox.style.display = "block";
+        }
+    }
+
+    window.onclick = function(e) {
+        if (e.target == document.getElementById("jobModal")) closeModal();
+    }
+</script>
+
+</body>
+</html>

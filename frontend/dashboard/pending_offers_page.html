@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pending Offers</title>
+    <style>
+        body { font-family: Arial; background: #f7f7f7; padding: 20px; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+        th, td { padding: 10px; border: 1px solid #ddd; }
+        th { background: #333; color: white; }
+
+        button {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+        }
+
+        .backbtn { background:#444 }
+        .rejectbtn { background:#dc3545 }
+        .rejectbtn:hover { background:#b52a37 }
+
+        .approvebtn { background:blue }
+        .approvebtn:hover { background:#ADD8E6 }
+
+        #offerSearch {
+            padding: 8px;
+            width: 260px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border:1px solid #aaa;
+        }
+
+        /* POPUP */
+        #previewPopup {
+            position: fixed;
+            top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.85);
+            display:none;
+            justify-content:center;
+            align-items:center;
+            z-index:9999;
+        }
+        #previewContent img,
+        #previewContent video {
+            max-width:90%;
+            max-height:90%;
+        }
+    </style>
+</head>
+<body>
+
+<button onclick="window.location.href='admin'" class="backbtn">⬅ Back Dashboard</button>
+
+<h1>Pending Offers</h1>
+
+<input type="text" id="offerSearch" placeholder="Search offers..." onkeyup="searchOffers()">
+
+<table>
+    <thead>
+        <tr>
+            <th>Offer ID</th>
+            <th>Shop Name</th>
+            <th>Owner Contact</th>
+            <th>Type</th>
+            <th>Preview</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody id="pendingOffers"></tbody>
+</table>
+
+<div id="previewPopup" onclick="closePreview()">
+    <div id="previewContent"></div>
+</div>
+
+<script>
+
+const BASE_URL = "";
+// if backend is different domain, use:
+// const BASE_URL = "http://127.0.0.1:8000";
+
+async function loadPendingOffers() {
+    let res = await fetch("/pending_offers/");
+    let json = await res.json();
+    let data = json.data || [];
+
+    window._offers = data;
+    renderOffers(data);
+}
+
+function renderOffers(list) {
+    let tb = document.getElementById("pendingOffers");
+    tb.innerHTML = "";
+
+    if (list.length === 0) {
+        tb.innerHTML = "<tr><td colspan='6'>No Pending Offers</td></tr>";
+        return;
+    }
+
+    list.forEach(o => {
+        let preview = "";
+
+        if (o.media_type === "image") {
+            preview = `
+                <img src="${BASE_URL}/${o.media_path}"
+                     width="70"
+                     style="cursor:pointer"
+                     onclick="openPreview('image','${BASE_URL}/${o.media_path}')">
+            `;
+        } else {
+            preview = `
+                <video width="120" style="cursor:pointer"
+                       onclick="openPreview('video','${BASE_URL}/${o.media_path}')">
+                    <source src="${BASE_URL}/${o.media_path}">
+                </video>
+            `;
+        }
+
+        tb.innerHTML += `
+        <tr>
+            <td>${o._id}</td>
+            <td>${o.shop_name || "Unknown"}</td>
+            <td>
+                Phone: ${o.owner_phone || "-"}<br>
+                Email: ${o.owner_email || "-"}
+            </td>
+            <td>${o.media_type}</td>
+            <td>${preview}</td>
+            <td>
+                <button class="approvebtn" onclick="approveOffer('${o._id}')">Approve</button>
+                <button class="rejectbtn" onclick="rejectOffer('${o._id}')">Reject</button>
+            </td>
+        </tr>`;
+    });
+}
+
+function searchOffers() {
+    let q = document.getElementById("offerSearch").value.toLowerCase();
+
+    let filtered = window._offers.filter(o =>
+        (o.shop_name || "").toLowerCase().includes(q) ||
+        (o.owner_phone || "").toLowerCase().includes(q) ||
+        (o.owner_email || "").toLowerCase().includes(q)
+    );
+
+    renderOffers(filtered);
+}
+
+function openPreview(type, url) {
+    let content = document.getElementById("previewContent");
+
+    if (type === "image") {
+        content.innerHTML = `<img src="${url}">`;
+    } else {
+        content.innerHTML = `
+            <video controls autoplay>
+                <source src="${url}">
+            </video>`;
+    }
+
+    document.getElementById("previewPopup").style.display = "flex";
+}
+
+function closePreview() {
+    document.getElementById("previewPopup").style.display = "none";
+}
+
+async function approveOffer(id) {
+    let form = new FormData();
+    form.append("offer_id", id);
+
+    let res = await fetch("/approve_offer/", {
+        method: "POST",
+        body: form
+    });
+
+    let out = await res.json();
+    alert(out.message);
+    loadPendingOffers();
+}
+
+async function rejectOffer(id) {
+    let form = new FormData();
+    form.append("offer_id", id);
+
+    let res = await fetch("/reject_offer/", {
+        method: "POST",
+        body: form
+    });
+
+    let out = await res.json();
+    alert(out.message);
+    loadPendingOffers();
+}
+
+loadPendingOffers();
+
+</script>
+</body>
+</html>
